@@ -1,0 +1,62 @@
+
+div.years_button {
+    position: fixed;
+    bottom: 5px;
+    left: 50px;
+
+}
+
+div.years_button div {
+    display: inline-block;
+    background-color: #BDD09F;
+    padding: 3px;
+    margin: 7px;
+}
+
+body {
+    background-color: black;
+}
+
+h2 {
+    text-align: center;
+    color: green;
+}
+
+div.years_buttons {
+    position: fixed;
+    top: 5px;
+    left: 50px;
+}
+
+div.years_buttons div {
+    background-color: rgb(251, 201, 127);
+    padding: 3px;
+    margin: 7px;
+}
+
+.d3-tip {
+    line-height: 1;
+    font-weight: bold;
+    padding: 12px;
+    background: #006633;
+    color: #fff;
+    border-radius: 2px;
+}
+
+.d3-tip:after {
+    box-sizing: border-box;
+    display: inline;
+    font-size: 10px;
+    width: 100%;
+    line-height: 1;
+    color: rgba(0, 0, 0, 0.8);
+    content: "\25BC";
+    position: absolute;
+    text-align: center;
+}
+
+.d3-tip.n:after {
+    margin: -1px 0 0 0;
+    top: 100%;
+    left: 0;
+}

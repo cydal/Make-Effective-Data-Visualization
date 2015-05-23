@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+  <script src="http://d3js.org/colorbrewer.v1.min.js"></script>
+  <script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
+    <style>
+
+	  div.years_button {
+	    position: fixed;
+	    bottom: 5px;
+	    left: 50px;
+
+	  }
+
+	  div.years_button div {
+	  	display: inline-block; 
+	    background-color: #BDD09F;
+	    padding: 3px;
+	    margin: 7px;
+	  }
+
+      body {
+      	background-color: black;
+      }
+
+      h2 {
+        text-align: center;
+        color: green;
+      }
+
+      div.years_buttons {
+        position: fixed;
+        top: 5px;
+        left: 50px;
+      }
+
+      div.years_buttons div {
+        background-color: rgb(251, 201, 127);
+        padding: 3px;
+        margin: 7px;
+      }
+
+	  .d3-tip {
+	  line-height: 1;
+	  font-weight: bold;
+	  padding: 12px;
+	  background: #006633;
+	  color: #fff;
+	  border-radius: 2px;
+	}
+
+	 .d3-tip:after {
+	  box-sizing: border-box;
+	  display: inline;
+	  font-size: 10px;
+	  width: 100%;
+	  line-height: 1;
+	  color: rgba(0, 0, 0, 0.8);
+	  content: "\25BC";
+	  position: absolute;
+	  text-align: center;
+	}
+
+	 .d3-tip.n:after {
+	  margin: -1px 0 0 0;
+	  top: 100%;
+	  left: 0;
+	}
+    </style>
+  <script type="text/javascript">
+  	function draw(geo_data) {
+         "use strict";
+        var margin = 75,
+            width = 1400 - margin,
+            height = 600 - margin;
+
+        d3.select("body")
+          .append("h2")
+          .text("World CO2 Emission (per Kt) ")
+
+        var tip = d3.tip()
+                    .attr('class', 'd3-tip')
+                    .offset([-10, 0])
+                    .html(function(d) {
+                      debugger;
+                      return d.properties.name;
+                    });
+
+        var svg = d3.select("body")
+            .append("svg")
+            .attr("width", width + margin)
+            .attr("height", height + margin)
+            .append('g')
+            .attr('class', 'map');
+
+        svg.call(tip);
+
+        var projection = d3.geo.mercator()
+        				   .scale(200)
+        				   .translate([width/2, height/1.2]);
+
+        var path = d3.geo.path().projection(projection);
+
+        var map = svg.selectAll('path')
+                     .data(geo_data.features)
+                     .enter()
+                     .append('path')
+                     .attr('d', path)
+                     .style('fill', 'white')
+                     .style('stroke', 'black')
+                     .style('stroke-width', 0.5);
+
+        var format = d3.time.format("X%Y");
+
+        var filler;
+
+        //Helper function for data munging
+        function premunging(data) {
+          data['Year'] = format.parse(data['Year']);
+          data['Emissions_Capita'] = +data['Emissions_Capita'];
+          data['Emissions_Yearly_Total'] = +data['Emissions_Yearly_Total'];
+          data['Global_Pop'] = +data['Global_Pop'];
+          data['Populations'] = +data['Populations'];
+          return data;
+          }
+
+        function rolledup(leaves) {
+        	var yearLeaf = [];
+
+        	leaves.forEach(function(d) {
+        		var coords = projection([d['LONG'], d['LAT']]);
+
+        		var each = {
+        			"LONG": coords[0],
+        			"LAT": coords[1], 
+        			"Country": d["Country"], 
+        			"EmitCapita": d["Emissions_Capita"], 
+        			"EmitYearly": d["Emissions_Yearly_Total"], 
+        			"GlobePop": d["Global_Pop"],
+        			"CountryPop": d["Populations"]
+        		}
+        		yearLeaf.push(each);
+        	});
+        	return yearLeaf;
+        }
+
+        function colorRolledUp(leaves) {
+
+        	var each = [];
+        	leaves.forEach(function(d) {
+        		each[d['Country']] = d['Emissions_Yearly_Total'];
+        	});
+        	return each;
+        }
+
+        d3.csv("emissions1.csv", premunging, function(d) {
+          	var nested = d3.nest()
+          				 .key(function(d) {
+          				 	return d.Year.getUTCFullYear();
+          				 })
+          				 .rollup(rolledup)
+          				 .entries(d);
+
+          	nested.pop();
+          	nested.pop();
+
+          	var colorNested = d3.nest()
+          						.key(function(d) {
+          							return d.Year.getUTCFullYear();
+          						})
+          						.rollup(colorRolledUp)
+          						.entries(d);
+
+          	colorNested.pop();
+          	colorNested.pop();
+
+
+          	var color_extent = d3.extent(nested, function(d, i) {
+          		return d['values'][i]['EmitYearly'];
+          	});
+          	
+
+        	var color = d3.scale.quantize()
+        				  .range(colorbrewer.Greens[9])
+        				  .domain(color_extent);
+
+        				  
+
+
+        	function keyfunc(d) {
+        		return d['Country'];
+        	}
+
+
+        	svg.selectAll('path')
+        	   .style("fill", function(d) {
+        	   	var name = d['properties']['name'];
+        	   	return color(colorNested[0]['values'][name]);
+        	   	
+        	   })
+
+			function update(year) {
+				var filtered = nested.filter(function(d) {
+					return new Date(d['key']).getUTCFullYear() == year;
+				});
+
+				var colorfiltered = colorNested.filter(function(d) {
+					return new Date(d['key']).getUTCFullYear() == year;
+				});
+				
+				var countrylist = Object.keys(colorfiltered[0]['values']);
+				
+
+				filler = svg.selectAll('path')
+								.style("fill", function(d) {
+									var name = d['properties']['name'];
+									if (countrylist.indexOf(d.properties.name !== -1)) {
+										return color(colorfiltered[0]['values'][name]);
+									}
+									else {
+										return "black";
+									}
+								})
+	            d3.select('h2')
+	              .text('World CO2 Emission (per Kt)' + "-" + year);
+			}
+
+			var years = [];
+
+			for(var i in nested) {
+				years.push(nested[i]['key']);
+			}
+			
+
+			var year_idx = 0;
+			var yearInterval = setInterval(function(d) {
+				update(years[year_idx]);
+				year_idx++;
+
+				if(year_idx >= years.length) {
+					clearInterval(yearInterval);
+
+					var buttons = d3.select('body')
+									.append('div')
+									.attr("class", "years_button")
+									.selectAll('div')
+									.data(years)
+									.enter()
+									.append('div')
+									.text(function(d) {
+										return d;
+									});
+
+
+					filler.on("mouseover", tip.show);
+
+					buttons.on("mouseover", function(d) {
+						d3.select(".years_button")
+						  .selectAll('div')
+						  .style("cursor", "pointer");
+					});
+
+					buttons.on("click", function(d) {
+						d3.select(".years_button")
+						  .selectAll("div")
+						  .style("background", "#BDD09F");
+
+						d3.select(this)
+						  .style("background", "#668D3C");
+						  update(d);
+					});
+
+
+					var legend = svg.append('g')
+									.attr('class', 'g')
+									.attr("transform", "translate(" + (width - 2370) + "," + (height - 110) + ")")
+									.selectAll('g')
+									.data(colorbrewer.Greens[9])
+									.enter()
+									.append('g');
+
+
+
+					legend.append('rect')
+						  .attr('x', width - 240)
+						  .attr("width", 20)
+						  .attr("height", 20)
+						  .attr("fill", function(d) {
+						  	return d;
+						  })
+						  .attr('y', function(d, i) {
+										return i * 20;
+									});
+					legend.append('text')
+						  .attr('x', width - 200)
+						  .attr("y", function(d, i) {
+						  	debugger;
+						  	return i * 20 + 20;
+						  })
+						  .attr("fill", "white")
+						  .text(function(d) {
+						  	return Math.round(color.invertExtent(d)[0]) + " - " + Math.round(color.invertExtent(d)[1]) + " Kilotonnes";
+						  }); 
+/*
+					var legend = svg.selectAll('rect')
+									.data(color.domain().reverse())
+									.enter()
+									.append('rect')
+									.attr('x', width - 240)
+									.attr('y', function(d, i) {
+										return i * 20;
+									})
+									.attr("width", 15)
+									.attr("height", 15)
+									.style("fill", color); */
+
+				}
+			}, 700);
+        });
+  	}
+  </script>
+</head>
+<body>
+	<script type="text/javascript">
+	d3.json("world_countries.json", draw)
+	</script>
+</body>
+</html>
